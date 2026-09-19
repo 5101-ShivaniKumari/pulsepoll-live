@@ -4,7 +4,7 @@
 
 ---
 
-## ⚡ Architecture at a Glance
+##  Architecture at a Glance
 
 PulsePoll is architected for sub-50ms live synchronization and high-concurrency vote ingestion. Instead of polling HTTP endpoints or overloading the primary database with write locks, the system splits workloads into a **high-speed in-memory real-time tier (Redis)** and a **durable audit store (MongoDB)**.
 
@@ -47,7 +47,7 @@ PulsePoll is architected for sub-50ms live synchronization and high-concurrency 
 
 ---
 
-## 🔑 Key Engineering Decisions & Trade-Offs
+##  Key Engineering Decisions & Trade-Offs
 
 ### 1. Redis vs. MongoDB Responsibility Split
 * **The Problem:** In a live poll, hundreds or thousands of participants click options almost simultaneously. Hitting relational or document stores with direct database writes and table locks on every vote creates query contention, latency spikes, and read replicas falling behind.
@@ -78,7 +78,7 @@ PulsePoll is architected for sub-50ms live synchronization and high-concurrency 
 
 ---
 
-## 📁 Repository Structure
+##  Repository Structure
 
 ```
 ├── backend/
@@ -116,7 +116,7 @@ PulsePoll is architected for sub-50ms live synchronization and high-concurrency 
 
 ---
 
-## 🚀 Quickstart: Running Locally
+##  Quickstart: Running Locally
 
 ### Option A: 1-Click with Docker Compose (Recommended)
 Make sure Docker Desktop is installed and running:
@@ -189,7 +189,7 @@ Deploy the `/frontend` folder to Vercel:
 
 ---
 
-## 🧪 Testing Multi-Tab Real-Time Sync
+##  Testing Multi-Tab Real-Time Sync
 
 1. Open **Tab A** (as Poll Creator) and create a poll. Navigate to the **Live Results** page.
 2. Open **Tab B** (in Incognito / Private Window) and navigate to the public vote link (`/poll/:id`).
