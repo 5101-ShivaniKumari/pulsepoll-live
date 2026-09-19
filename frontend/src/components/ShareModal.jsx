@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Copy, Check, X, Share2, MessageCircle, Send } from 'lucide-react'
 import { useToast } from '../context/ToastContext'
+import { getShareablePollUrl } from '../utils/url'
 
 export function ShareModal({ poll, isOpen, onClose }) {
   const [copied, setCopied] = useState(false)
@@ -9,7 +10,7 @@ export function ShareModal({ poll, isOpen, onClose }) {
 
   if (!isOpen || !poll) return null
 
-  const shareUrl = `${window.location.origin}/poll/${poll.id}`
+  const shareUrl = getShareablePollUrl(poll.id)
 
   const handleCopy = async () => {
     try {
