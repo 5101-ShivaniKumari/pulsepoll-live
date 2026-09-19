@@ -157,7 +157,7 @@ Frontend will start on `http://localhost:5173`.
 
 ---
 
-## 🌐 Deploying to Production (Free Tier Friendly)
+##  Deploying to Production (Free Tier Friendly)
 
 ### 1. Database Tier (Free)
 1. **MongoDB:** Create a free tier cluster on [MongoDB Atlas](https://www.mongodb.com/cloud/atlas). Get the connection string:
