@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  # MongoDB - Durable data store for Users, Polls, and Audit Vote records
+  mongodb:
+    image: mongo:7.0
+    container_name: pulsepoll_mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - pulsepoll_network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis - High-speed hot path for atomic HINCRBY counts, SADD deduplication & Pub/Sub
+  redis:
+    image: redis:7.2-alpine
+    container_name: pulsepoll_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - pulsepoll_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Go Backend - Gin REST API & Gorilla WebSocket Hub with Redis Pub/Sub listener
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pulsepoll_backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - MONGO_URI=mongodb://mongodb:27017
+      - MONGO_DB_NAME=livepoll_db
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=production-grade-pulsepoll-secret-key-32-chars!
+      - CORS_ORIGIN=*
+      - APP_ENV=production
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - pulsepoll_network
+
+  # React Frontend - Modern SPA with animated bar charts, QR code, live websockets
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: pulsepoll_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - pulsepoll_network
+
+volumes:
+  mongo_data:
+  redis_data:
+
+networks:
+  pulsepoll_network:
+    driver: bridge
