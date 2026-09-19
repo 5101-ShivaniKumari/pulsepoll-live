@@ -49,17 +49,7 @@ export function Navbar() {
             <Activity size={22} color="#ffffff" />
           </div>
           <div>
-            <span style={{
-              fontFamily: 'var(--font-heading)',
-              fontWeight: 800,
-              fontSize: '1.35rem',
-              background: isDark
-                ? 'linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%)'
-                : 'linear-gradient(135deg, #0f172a 0%, #4f46e5 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              letterSpacing: '-0.03em',
-            }}>
+            <span className="navbar-brand-text">
               PulsePoll
             </span>
             <span style={{

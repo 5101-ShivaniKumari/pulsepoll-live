@@ -2,6 +2,34 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 /* ============================================================
+   NAVBAR BRAND TEXT GRADIENT
+   Using CSS classes instead of inline styles avoids the
+   gradient-clip flicker/invisible-text bug on theme transitions
+   ============================================================ */
+.navbar-brand-text {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 1.35rem;
+  letter-spacing: -0.03em;
+  /* Dark mode: white-to-slate gradient */
+  background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  display: inline-block;
+}
+
+[data-theme="light"] .navbar-brand-text {
+  /* Light mode: dark-navy-to-indigo gradient */
+  background: linear-gradient(135deg, #1e1b4b 0%, #4f46e5 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* ============================================================
    DESIGN TOKENS — Common (unchanged by theme)
    ============================================================ */
 :root {
