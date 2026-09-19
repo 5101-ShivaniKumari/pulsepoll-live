@@ -65,6 +65,12 @@ PulsePoll is architected for sub-50ms live synchronization and high-concurrency 
 * The Go backend dynamically subscribes to Redis Pub/Sub channels (`poll:events:<poll_id>`) per active poll room. When any client votes, Redis Pub/Sub notifies all Go instances, which fan out the updated percentages and counts to all connected WebSockets in <10ms.
 * Rooms with 0 active viewers cleanly terminate their Redis subscription, avoiding memory leaks.
 
+### 4. Redis Live Viewer Presence (Ephemeral Connection Tracking)
+* **Distinction from Vote Counting:** While vote tallies represent permanently increasing numeric counters (`HINCRBY`), active viewer presence is dynamic ephemeral state that rises and falls with browser tab lifecycle.
+* **Implementation:** When a browser opens the live results view, its WebSocket connection registers into a Redis Set `poll:<id>:active_viewers` (`SADD`). When a client disconnects or closes the tab, the connection ID is cleanly purged (`SREM`).
+* **Live Broadcast:** The active viewer cardinality (`SCARD`) is broadcast to all viewers (`viewer_update` event), updating the running **"👀 X watching now"** presence pill live across all screens.
+* **Vote Burst Animation:** Whenever a new vote arrives, the frontend triggers a brief, tasteful glowing pulse and floating `+1` highlight on the corresponding option to make live interactivity visually felt.
+
 ---
 
 ## 📁 Repository Structure

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, Link, useLocation } from 'react-router-dom'
 import { api } from '../services/api'
 import { useAuth } from '../context/AuthContext'
@@ -8,7 +8,7 @@ import { AnimatedBarChart } from '../components/AnimatedBarChart'
 import { StatusBadge } from '../components/StatusBadge'
 import { ShareModal } from '../components/ShareModal'
 import { ConfirmationModal } from '../components/ConfirmationModal'
-import { Share2, Users, Vote, Lock, AlertCircle, Wifi, WifiOff } from 'lucide-react'
+import { Share2, Users, Vote, Lock, AlertCircle, Wifi, WifiOff, Eye } from 'lucide-react'
 
 export function PollResultsPage() {
   const { id } = useParams()
@@ -21,6 +21,12 @@ export function PollResultsPage() {
   const [shareModalOpen, setShareModalOpen] = useState(false)
   const [closeModalOpen, setCloseModalOpen] = useState(false)
   const [closing, setClosing] = useState(false)
+
+  // Real-time Live Viewer Presence & Vote Burst States
+  const [viewerCount, setViewerCount] = useState(1)
+  const [recentlyVotedOptionId, setRecentlyVotedOptionId] = useState(null)
+  const [voteBurstActive, setVoteBurstActive] = useState(false)
+  const burstTimeoutRef = useRef(null)
 
   const userVotedOptionId = location.state?.votedOptionId || null
 
@@ -45,6 +51,36 @@ export function PollResultsPage() {
   const handleWebSocketMessage = useCallback((msg) => {
     if (!msg) return
 
+    // 1. Live Viewer Presence Update
+    if (msg.type === 'viewer_update') {
+      if (msg.viewer_count !== undefined) {
+        setViewerCount(Math.max(1, msg.viewer_count))
+      }
+      return
+    }
+
+    // 2. Vote Cast Event (with subtle burst animation)
+    if (msg.type === 'vote_cast') {
+      if (msg.viewer_count !== undefined && msg.viewer_count > 0) {
+        setViewerCount(msg.viewer_count)
+      }
+
+      // Trigger subtle pulse & +1 indicator on the voted option
+      if (msg.recent_voted_option_id) {
+        setRecentlyVotedOptionId(msg.recent_voted_option_id)
+        setVoteBurstActive(true)
+
+        if (burstTimeoutRef.current) {
+          clearTimeout(burstTimeoutRef.current)
+        }
+        burstTimeoutRef.current = setTimeout(() => {
+          setRecentlyVotedOptionId(null)
+          setVoteBurstActive(false)
+        }, 1200)
+      }
+    }
+
+    // 3. Update Poll Data State
     if (msg.type === 'vote_cast' || msg.type === 'poll_state') {
       setPoll(prev => {
         if (!prev) return prev
@@ -58,7 +94,7 @@ export function PollResultsPage() {
 
         return {
           ...prev,
-          total_votes: msg.total_votes,
+          total_votes: msg.total_votes !== undefined ? msg.total_votes : prev.total_votes,
           percentages: msg.percentages || prev.percentages,
           is_closed: msg.is_closed !== undefined ? msg.is_closed : prev.is_closed,
           options: updatedOptions,
@@ -71,6 +107,15 @@ export function PollResultsPage() {
   }, [info])
 
   const { status: wsStatus } = useWebSocket(id, handleWebSocketMessage)
+
+  // Clean up animation timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (burstTimeoutRef.current) {
+        clearTimeout(burstTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // Handle Close Poll action by creator
   const handleClosePoll = async () => {
@@ -122,7 +167,7 @@ export function PollResultsPage() {
 
   return (
     <div style={{ maxWidth: '720px', margin: '1rem auto 0' }}>
-      <div className="glass-card" style={{ padding: '2.25rem 2rem' }}>
+      <div className={`glass-card ${voteBurstActive ? 'vote-burst-active' : ''}`} style={{ padding: '2.25rem 2rem' }}>
         {/* Header Badges & Actions */}
         <div style={{
           display: 'flex',
@@ -132,8 +177,15 @@ export function PollResultsPage() {
           gap: '0.75rem',
           marginBottom: '1.5rem',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
             <StatusBadge isClosed={poll.is_closed} totalVotes={poll.total_votes} />
+
+            {/* Live Viewer Presence Badge */}
+            <span className="badge badge-viewers" title="Active live viewers watching this poll">
+              <Eye size={13} style={{ marginRight: '2px' }} />
+              <span className="pulse-dot-indigo" />
+              <span>{viewerCount} {viewerCount === 1 ? 'watching' : 'watching'}</span>
+            </span>
 
             {/* WebSocket connection indicator */}
             <span style={{
@@ -145,7 +197,7 @@ export function PollResultsPage() {
               fontFamily: 'var(--font-mono)',
             }}>
               {wsStatus === 'connected' ? <Wifi size={13} /> : <WifiOff size={13} />}
-              <span>{wsStatus === 'connected' ? 'Socket Connected' : 'Reconnecting...'}</span>
+              <span>{wsStatus === 'connected' ? 'Connected' : 'Reconnecting...'}</span>
             </span>
           </div>
 
@@ -184,7 +236,7 @@ export function PollResultsPage() {
           </p>
         )}
 
-        {/* Total Votes Banner */}
+        {/* Total Votes Banner with Live Running Count */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -209,12 +261,13 @@ export function PollResultsPage() {
           </span>
         </div>
 
-        {/* Live Visual Animated Chart */}
+        {/* Live Visual Animated Chart with +1 highlight burst */}
         <AnimatedBarChart
           options={poll.options}
           totalVotes={poll.total_votes}
           percentages={poll.percentages}
           userVoteOptionId={userVotedOptionId || (poll.has_voted ? poll.voted_for : null)}
+          recentlyVotedOptionId={recentlyVotedOptionId}
         />
 
         {/* Creator Control Strip */}

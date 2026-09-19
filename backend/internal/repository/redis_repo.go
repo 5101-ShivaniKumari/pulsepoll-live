@@ -18,10 +18,11 @@ type RedisRepo struct {
 	isInMemory bool
 
 	// In-memory fallback structures
-	mu             sync.RWMutex
-	memCounts      map[string]map[string]int64 // pollID -> (optionID -> count)
-	memVoters      map[string]map[string]bool  // pollID -> (voterToken -> bool)
-	memSubscribers map[string][]chan []byte    // pollID -> list of active event channels
+	mu               sync.RWMutex
+	memCounts        map[string]map[string]int64 // pollID -> (optionID -> count)
+	memVoters        map[string]map[string]bool  // pollID -> (voterToken -> bool)
+	memActiveViewers map[string]map[string]bool  // pollID -> (clientID -> bool)
+	memSubscribers   map[string][]chan []byte    // pollID -> list of active event channels
 }
 
 func NewRedisRepo(redisURL string) (*RedisRepo, error) {
@@ -39,10 +40,11 @@ func NewRedisRepo(redisURL string) (*RedisRepo, error) {
 	if err != nil || pingErr != nil {
 		log.Printf("[INFO] Redis at '%s' is not reachable (%v). Using fast In-Memory Pub/Sub & Caching Engine.", redisURL, pingErr)
 		return &RedisRepo{
-			isInMemory:     true,
-			memCounts:      make(map[string]map[string]int64),
-			memVoters:      make(map[string]map[string]bool),
-			memSubscribers: make(map[string][]chan []byte),
+			isInMemory:       true,
+			memCounts:        make(map[string]map[string]int64),
+			memVoters:        make(map[string]map[string]bool),
+			memActiveViewers: make(map[string]map[string]bool),
+			memSubscribers:   make(map[string][]chan []byte),
 		}, nil
 	}
 
@@ -71,6 +73,71 @@ func pollCountsKey(pollID string) string {
 
 func pollVotersKey(pollID string) string {
 	return fmt.Sprintf("poll:%s:voters", pollID)
+}
+
+func pollActiveViewersKey(pollID string) string {
+	return fmt.Sprintf("poll:%s:active_viewers", pollID)
+}
+
+// AddViewer registers a client WebSocket ID into the active viewers set in Redis.
+func (r *RedisRepo) AddViewer(ctx context.Context, pollID, clientID string) (int64, error) {
+	if r.isInMemory {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		if r.memActiveViewers[pollID] == nil {
+			r.memActiveViewers[pollID] = make(map[string]bool)
+		}
+		r.memActiveViewers[pollID][clientID] = true
+		return int64(len(r.memActiveViewers[pollID])), nil
+	}
+
+	key := pollActiveViewersKey(pollID)
+	pipeline := r.client.Pipeline()
+	pipeline.SAdd(ctx, key, clientID)
+	pipeline.Expire(ctx, key, 24*time.Hour)
+	countCmd := pipeline.SCard(ctx, key)
+	_, err := pipeline.Exec(ctx)
+	if err != nil {
+		return 1, err
+	}
+	return countCmd.Val(), nil
+}
+
+// RemoveViewer unregisters a client WebSocket ID from the active viewers set in Redis.
+func (r *RedisRepo) RemoveViewer(ctx context.Context, pollID, clientID string) (int64, error) {
+	if r.isInMemory {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		if r.memActiveViewers[pollID] != nil {
+			delete(r.memActiveViewers[pollID], clientID)
+		}
+		return int64(len(r.memActiveViewers[pollID])), nil
+	}
+
+	key := pollActiveViewersKey(pollID)
+	pipeline := r.client.Pipeline()
+	pipeline.SRem(ctx, key, clientID)
+	countCmd := pipeline.SCard(ctx, key)
+	_, err := pipeline.Exec(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return countCmd.Val(), nil
+}
+
+// GetViewerCount returns the current count of active viewers for a poll from Redis.
+func (r *RedisRepo) GetViewerCount(ctx context.Context, pollID string) (int64, error) {
+	if r.isInMemory {
+		r.mu.RLock()
+		defer r.mu.RUnlock()
+		if r.memActiveViewers[pollID] == nil {
+			return 0, nil
+		}
+		return int64(len(r.memActiveViewers[pollID])), nil
+	}
+
+	key := pollActiveViewersKey(pollID)
+	return r.client.SCard(ctx, key).Result()
 }
 
 func pollEventChannel(pollID string) string {

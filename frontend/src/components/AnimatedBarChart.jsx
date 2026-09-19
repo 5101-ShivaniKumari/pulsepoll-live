@@ -1,5 +1,5 @@
 import React from 'react'
-import { Trophy, Check } from 'lucide-react'
+import { Trophy, Check, Sparkles } from 'lucide-react'
 
 const BAR_GRADIENTS = [
   'var(--bar-color-1)',
@@ -10,7 +10,13 @@ const BAR_GRADIENTS = [
   'var(--bar-color-6)',
 ]
 
-export function AnimatedBarChart({ options = [], totalVotes = 0, percentages = {}, userVoteOptionId = null }) {
+export function AnimatedBarChart({
+  options = [],
+  totalVotes = 0,
+  percentages = {},
+  userVoteOptionId = null,
+  recentlyVotedOptionId = null,
+}) {
   // Find highest vote count to mark leader
   let maxCount = -1
   if (totalVotes > 0) {
@@ -27,23 +33,32 @@ export function AnimatedBarChart({ options = [], totalVotes = 0, percentages = {
         const pct = percentages[option.id] !== undefined ? percentages[option.id] : 0
         const isLeading = totalVotes > 0 && option.vote_count === maxCount && maxCount > 0
         const isUserVote = userVoteOptionId === option.id
+        const isRecentlyVoted = recentlyVotedOptionId === option.id
         const gradient = BAR_GRADIENTS[index % BAR_GRADIENTS.length]
 
         return (
           <div
             key={option.id}
-            className="result-row"
+            className={`result-row ${isRecentlyVoted ? 'option-flash-highlight' : ''}`}
             style={{
               background: isUserVote ? 'rgba(99, 102, 241, 0.07)' : 'transparent',
               padding: isUserVote ? '0.75rem 1rem' : '0.25rem 0',
-              borderRadius: isUserVote ? 'var(--radius-md)' : '0',
-              border: isUserVote ? '1px solid rgba(99, 102, 241, 0.25)' : 'none',
+              borderRadius: isUserVote ? 'var(--radius-md)' : 'var(--radius-sm)',
+              border: isUserVote ? '1px solid rgba(99, 102, 241, 0.25)' : '1px solid transparent',
               transition: 'all var(--transition-normal)',
+              position: 'relative',
             }}
           >
             <div className="result-header">
               <div className="result-option-text">
                 <span>{option.text}</span>
+
+                {isRecentlyVoted && (
+                  <span className="floating-plus-one">
+                    +1
+                  </span>
+                )}
+
                 {isUserVote && (
                   <span style={{
                     display: 'inline-flex',
@@ -59,6 +74,7 @@ export function AnimatedBarChart({ options = [], totalVotes = 0, percentages = {
                     <Check size={12} /> Your Vote
                   </span>
                 )}
+
                 {isLeading && (
                   <span style={{
                     display: 'inline-flex',

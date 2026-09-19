@@ -125,14 +125,17 @@ func (s *VoteService) CastVote(ctx context.Context, pollIDStr string, req *model
 	}
 
 	// 8. Construct Live Update
+	viewerCount, _ := s.redisRepo.GetViewerCount(ctx, pollIDStr)
 	liveUpdate := &models.LivePollUpdate{
-		Type:        "vote_cast",
-		PollID:      pollIDStr,
-		TotalVotes:  totalVotes,
-		OptionVotes: counts,
-		Percentages: percentages,
-		IsClosed:    poll.IsClosed,
-		Timestamp:   time.Now().UnixMilli(),
+		Type:                "vote_cast",
+		PollID:              pollIDStr,
+		TotalVotes:          totalVotes,
+		OptionVotes:         counts,
+		Percentages:         percentages,
+		IsClosed:            poll.IsClosed,
+		ViewerCount:         viewerCount,
+		RecentVotedOptionID: req.OptionID,
+		Timestamp:           time.Now().UnixMilli(),
 	}
 
 	// 9. Publish update to Redis Pub/Sub channel

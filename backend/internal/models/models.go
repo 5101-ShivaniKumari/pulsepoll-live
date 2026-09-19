@@ -50,13 +50,15 @@ type Vote struct {
 
 // LivePollUpdate is published to Redis and broadcast over WebSockets
 type LivePollUpdate struct {
-	Type        string             `json:"type"` // "vote_cast", "poll_closed", "poll_state"
-	PollID      string             `json:"poll_id"`
-	TotalVotes  int64              `json:"total_votes"`
-	OptionVotes map[string]int64   `json:"option_votes"`
-	Percentages map[string]float64 `json:"percentages"`
-	IsClosed    bool               `json:"is_closed"`
-	Timestamp   int64              `json:"timestamp"`
+	Type                string             `json:"type"` // "vote_cast", "poll_closed", "poll_state", "viewer_update"
+	PollID              string             `json:"poll_id"`
+	TotalVotes          int64              `json:"total_votes"`
+	OptionVotes         map[string]int64   `json:"option_votes"`
+	Percentages         map[string]float64 `json:"percentages"`
+	IsClosed            bool               `json:"is_closed"`
+	ViewerCount         int64              `json:"viewer_count"`
+	RecentVotedOptionID string             `json:"recent_voted_option_id,omitempty"`
+	Timestamp           int64              `json:"timestamp"`
 }
 
 // DTOs for requests and responses

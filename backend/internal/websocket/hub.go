@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/livepoll/backend/internal/models"
 	"github.com/livepoll/backend/internal/repository"
@@ -32,6 +33,7 @@ var upgrader = websocket.Upgrader{
 
 // Client represents a single connected browser WebSocket
 type Client struct {
+	id       string
 	hub      *Hub
 	conn     *websocket.Conn
 	send     chan []byte
@@ -120,7 +122,19 @@ func (h *Hub) addClient(client *Client) {
 	room.clients[client] = true
 	room.mu.Unlock()
 
-	log.Printf("[WS] Client connected to poll room: %s (Total in room: %d)", client.pollID, len(room.clients))
+	// Register active viewer in Redis
+	viewerCount, _ := h.redisRepo.AddViewer(context.Background(), client.pollID, client.id)
+
+	log.Printf("[WS] Client %s connected to poll room: %s (Active viewers: %d)", client.id, client.pollID, viewerCount)
+
+	// Broadcast updated viewer count to all active viewers
+	update := &models.LivePollUpdate{
+		Type:        "viewer_update",
+		PollID:      client.pollID,
+		ViewerCount: viewerCount,
+		Timestamp:   time.Now().UnixMilli(),
+	}
+	_ = h.redisRepo.PublishPollUpdate(context.Background(), client.pollID, update)
 }
 
 func (h *Hub) removeClient(client *Client) {
@@ -138,6 +152,20 @@ func (h *Hub) removeClient(client *Client) {
 	}
 	empty := len(room.clients) == 0
 	room.mu.Unlock()
+
+	// Unregister viewer from Redis
+	viewerCount, _ := h.redisRepo.RemoveViewer(context.Background(), client.pollID, client.id)
+
+	log.Printf("[WS] Client %s disconnected from poll room: %s (Active viewers: %d)", client.id, client.pollID, viewerCount)
+
+	// Broadcast decremented viewer count to remaining viewers
+	update := &models.LivePollUpdate{
+		Type:        "viewer_update",
+		PollID:      client.pollID,
+		ViewerCount: viewerCount,
+		Timestamp:   time.Now().UnixMilli(),
+	}
+	_ = h.redisRepo.PublishPollUpdate(context.Background(), client.pollID, update)
 
 	if empty {
 		// Clean up Redis/Memory subscription and room to free resources
@@ -283,6 +311,7 @@ func ServeWS(hub *Hub, w http.ResponseWriter, r *http.Request, pollID string, in
 	}
 
 	client := &Client{
+		id:     "ws_" + uuid.New().String()[:8],
 		hub:    hub,
 		conn:   conn,
 		send:   make(chan []byte, 64),
