@@ -8,7 +8,7 @@ import { AnimatedBarChart } from '../components/AnimatedBarChart'
 import { StatusBadge } from '../components/StatusBadge'
 import { ShareModal } from '../components/ShareModal'
 import { ConfirmationModal } from '../components/ConfirmationModal'
-import { Share2, Users, Vote, Lock, AlertCircle, Wifi, WifiOff, Eye } from 'lucide-react'
+import { Share2, Users, Vote, Lock, AlertCircle, Wifi, WifiOff, Eye, Clock } from 'lucide-react'
 
 export function PollResultsPage() {
   const { id } = useParams()
@@ -165,6 +165,15 @@ export function PollResultsPage() {
 
   const isCreator = user && poll.creator_id && (user.id === poll.creator_id || user.id === poll.creator_id?.toString())
 
+  const formattedCloseTime = poll.expiry_at ? new Date(poll.expiry_at).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }) : null
+
   return (
     <div style={{ maxWidth: '720px', margin: '1rem auto 0' }}>
       <div className={`glass-card ${voteBurstActive ? 'vote-burst-active' : ''}`} style={{ padding: '2.25rem 2rem' }}>
@@ -179,6 +188,21 @@ export function PollResultsPage() {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
             <StatusBadge isClosed={poll.is_closed} totalVotes={poll.total_votes} />
+
+            {/* Scheduled Auto-Close Time Pill */}
+            {!poll.is_closed && formattedCloseTime && (
+              <span className="badge" style={{
+                background: 'rgba(245, 158, 11, 0.12)',
+                color: '#fbbf24',
+                border: '1px solid rgba(245, 158, 11, 0.3)',
+                textTransform: 'none',
+                fontSize: '0.78rem',
+                fontFamily: 'var(--font-sans)',
+              }}>
+                <Clock size={13} style={{ marginRight: '2px' }} />
+                <span>Closes {formattedCloseTime}</span>
+              </span>
+            )}
 
             {/* Live Viewer Presence Badge */}
             <span className="badge badge-viewers" title="Active live viewers watching this poll">

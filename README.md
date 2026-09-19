@@ -71,6 +71,11 @@ PulsePoll is architected for sub-50ms live synchronization and high-concurrency 
 * **Live Broadcast:** The active viewer cardinality (`SCARD`) is broadcast to all viewers (`viewer_update` event), updating the running **"👀 X watching now"** presence pill live across all screens.
 * **Vote Burst Animation:** Whenever a new vote arrives, the frontend triggers a brief, tasteful glowing pulse and floating `+1` highlight on the corresponding option to make live interactivity visually felt.
 
+### 5. Scheduled Auto-Close Engine & Custom Date/Time
+* **Timezone Safety:** Creators can pick preset durations or an exact custom date and time (`datetime-local`). Timestamps are normalized on the client and stored in MongoDB as UTC ISO 8601 strings, preventing timezone drift.
+* **Server-Side Enforcement:** Voting requests validate server-side against the server clock to ensure client clocks cannot bypass expiry.
+* **Background Scheduler:** A background ticker in the Go backend (`StartAutoCloseScheduler`) periodically detects expired polls, atomically transitions them to `is_closed: true`, and broadcasts the `poll_closed` event over WebSockets so all connected voter and results screens update live without page refresh.
+
 ---
 
 ## 📁 Repository Structure

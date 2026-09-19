@@ -255,3 +255,45 @@ func (s *PollService) CalculatePercentages(options []models.Option, totalVotes i
 	}
 	return percentages
 }
+
+// StartAutoCloseScheduler runs a background worker checking for expired polls and broadcasting closures in real time
+func (s *PollService) StartAutoCloseScheduler(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	go func() {
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				expiredPolls, err := s.mongoRepo.FindAndCloseExpiredPolls(ctx)
+				if err != nil || len(expiredPolls) == 0 {
+					continue
+				}
+				for _, p := range expiredPolls {
+					pidStr := p.ID.Hex()
+					detail, err := s.GetPoll(ctx, pidStr, "")
+					if err == nil {
+						optVotes := make(map[string]int64)
+						for _, opt := range detail.Options {
+							optVotes[opt.ID] = opt.VoteCount
+						}
+
+						viewerCount, _ := s.redisRepo.GetViewerCount(ctx, pidStr)
+						update := &models.LivePollUpdate{
+							Type:        "poll_closed",
+							PollID:      pidStr,
+							TotalVotes:  detail.TotalVotes,
+							OptionVotes: optVotes,
+							Percentages: detail.Percentages,
+							IsClosed:    true,
+							ViewerCount: viewerCount,
+							Timestamp:   time.Now().UnixMilli(),
+						}
+						_ = s.redisRepo.PublishPollUpdate(ctx, pidStr, update)
+					}
+				}
+			}
+		}
+	}()
+}

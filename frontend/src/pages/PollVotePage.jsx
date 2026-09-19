@@ -1,16 +1,17 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import confetti from 'canvas-confetti'
 import { api } from '../services/api'
 import { useToast } from '../context/ToastContext'
+import { useWebSocket } from '../hooks/useWebSocket'
 import { StatusBadge } from '../components/StatusBadge'
-import { CheckCircle2, Lock, BarChart3, AlertCircle, ArrowRight, Share2 } from 'lucide-react'
+import { CheckCircle2, Lock, BarChart3, AlertCircle, ArrowRight, Share2, Clock } from 'lucide-react'
 import { ShareModal } from '../components/ShareModal'
 
 export function PollVotePage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { success, error: toastError } = useToast()
+  const { success, error: toastError, info } = useToast()
 
   const [poll, setPoll] = useState(null)
   const [selectedOption, setSelectedOption] = useState('')
@@ -18,23 +19,35 @@ export function PollVotePage() {
   const [submitting, setSubmitting] = useState(false)
   const [shareModalOpen, setShareModalOpen] = useState(false)
 
-  useEffect(() => {
-    async function loadPoll() {
-      try {
-        setLoading(true)
-        const data = await api.polls.get(id)
-        setPoll(data)
-        if (data.has_voted && data.voted_for) {
-          setSelectedOption(data.voted_for)
-        }
-      } catch (err) {
-        toastError(err.message || 'Poll not found')
-      } finally {
-        setLoading(false)
+  const loadPoll = useCallback(async () => {
+    try {
+      setLoading(true)
+      const data = await api.polls.get(id)
+      setPoll(data)
+      if (data.has_voted && data.voted_for) {
+        setSelectedOption(data.voted_for)
       }
+    } catch (err) {
+      toastError(err.message || 'Poll not found')
+    } finally {
+      setLoading(false)
     }
-    loadPoll()
   }, [id, toastError])
+
+  useEffect(() => {
+    loadPoll()
+  }, [loadPoll])
+
+  // Real-time WebSocket listener so voter tab auto-closes when scheduled close time arrives
+  const handleWebSocketMessage = useCallback((msg) => {
+    if (!msg) return
+    if (msg.type === 'poll_closed') {
+      setPoll(prev => prev ? { ...prev, is_closed: true } : prev)
+      info('This poll has reached its scheduled close time.')
+    }
+  }, [info])
+
+  useWebSocket(id, handleWebSocketMessage)
 
   const handleVote = async (e) => {
     e.preventDefault()
@@ -60,12 +73,10 @@ export function PollVotePage() {
       }
 
       success('Your vote has been counted in real time!')
-      // Redirect to live results view
       navigate(`/poll/${id}/results`, { state: { voted: true, votedOptionId: selectedOption } })
     } catch (err) {
       if (err.status === 409) {
         toastError('You have already voted on this poll.')
-        // Redirect to results anyway
         setTimeout(() => navigate(`/poll/${id}/results`), 1200)
       } else {
         toastError(err.message || 'Failed to submit vote')
@@ -73,6 +84,21 @@ export function PollVotePage() {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  // Format scheduled close time in user's local timezone
+  const formatCloseTime = (expiryString) => {
+    if (!expiryString) return null
+    const date = new Date(expiryString)
+    if (isNaN(date.getTime())) return null
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    })
   }
 
   if (loading) {
@@ -99,12 +125,31 @@ export function PollVotePage() {
     )
   }
 
+  const formattedCloseTime = formatCloseTime(poll.expiry_at)
+
   return (
     <div style={{ maxWidth: '640px', margin: '1rem auto 0' }}>
       <div className="glass-card" style={{ padding: '2.25rem 2rem' }}>
         {/* Top Header info */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <StatusBadge isClosed={poll.is_closed} totalVotes={poll.total_votes} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+            <StatusBadge isClosed={poll.is_closed} totalVotes={poll.total_votes} />
+
+            {/* Scheduled Auto-Close Time Pill */}
+            {!poll.is_closed && formattedCloseTime && (
+              <span className="badge" style={{
+                background: 'rgba(245, 158, 11, 0.12)',
+                color: '#fbbf24',
+                border: '1px solid rgba(245, 158, 11, 0.3)',
+                textTransform: 'none',
+                fontSize: '0.78rem',
+                fontFamily: 'var(--font-sans)',
+              }}>
+                <Clock size={13} style={{ marginRight: '2px' }} />
+                <span>Closes {formattedCloseTime}</span>
+              </span>
+            )}
+          </div>
 
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button

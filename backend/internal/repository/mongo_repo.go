@@ -285,7 +285,7 @@ func (r *MongoRepo) ClosePoll(ctx context.Context, pollID primitive.ObjectID, cr
 		r.mu.Lock()
 		defer r.mu.Unlock()
 		p, exists := r.memPolls[pollID.Hex()]
-		if !exists || p.CreatorID != creatorID {
+		if !exists || (creatorID != primitive.NilObjectID && p.CreatorID != creatorID) {
 			return ErrPollNotFound
 		}
 		p.IsClosed = true
@@ -294,9 +294,12 @@ func (r *MongoRepo) ClosePoll(ctx context.Context, pollID primitive.ObjectID, cr
 	}
 
 	filter := bson.M{
-		"_id":        pollID,
-		"creator_id": creatorID,
+		"_id": pollID,
 	}
+	if creatorID != primitive.NilObjectID {
+		filter["creator_id"] = creatorID
+	}
+
 	update := bson.M{
 		"$set": bson.M{
 			"is_closed":  true,
@@ -312,6 +315,56 @@ func (r *MongoRepo) ClosePoll(ctx context.Context, pollID primitive.ObjectID, cr
 		return ErrPollNotFound
 	}
 	return nil
+}
+
+// FindAndCloseExpiredPolls finds active polls whose expiry time has passed, marks them closed, and returns them.
+func (r *MongoRepo) FindAndCloseExpiredPolls(ctx context.Context) ([]models.Poll, error) {
+	now := time.Now().UTC()
+	var expiredPolls []models.Poll
+
+	if r.isInMemory {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		for _, p := range r.memPolls {
+			if !p.IsClosed && p.ExpiryAt != nil && now.After(*p.ExpiryAt) {
+				p.IsClosed = true
+				p.UpdatedAt = now
+				copyPoll := *p
+				expiredPolls = append(expiredPolls, copyPoll)
+			}
+		}
+		return expiredPolls, nil
+	}
+
+	filter := bson.M{
+		"is_closed": false,
+		"expiry_at": bson.M{"$lte": now, "$ne": nil},
+	}
+
+	cursor, err := r.polls.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	if err := cursor.All(ctx, &expiredPolls); err != nil {
+		return nil, err
+	}
+
+	if len(expiredPolls) > 0 {
+		var ids []primitive.ObjectID
+		for _, p := range expiredPolls {
+			ids = append(ids, p.ID)
+		}
+		_, _ = r.polls.UpdateMany(ctx, bson.M{"_id": bson.M{"$in": ids}}, bson.M{
+			"$set": bson.M{
+				"is_closed":  true,
+				"updated_at": now,
+			},
+		})
+	}
+
+	return expiredPolls, nil
 }
 
 func (r *MongoRepo) DeletePoll(ctx context.Context, pollID primitive.ObjectID, creatorID primitive.ObjectID) error {

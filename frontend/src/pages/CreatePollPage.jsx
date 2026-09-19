@@ -2,17 +2,29 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
 import { useToast } from '../context/ToastContext'
-import { Plus, Trash2, Clock, HelpCircle, ArrowRight, Sparkles } from 'lucide-react'
+import { Plus, Trash2, Clock, Calendar, ArrowRight, Sparkles } from 'lucide-react'
 
 export function CreatePollPage() {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [options, setOptions] = useState(['', '', ''])
-  const [expiryOption, setExpiryOption] = useState('none') // 'none' | '1h' | '24h' | '7d'
+  const [expiryOption, setExpiryOption] = useState('none') // 'none' | '1h' | '24h' | '7d' | 'custom'
+  const [customDateTime, setCustomDateTime] = useState('')
   const [loading, setLoading] = useState(false)
 
   const { success, error: toastError } = useToast()
   const navigate = useNavigate()
+
+  // Calculate min datetime for picker (now + 2 minutes formatted for datetime-local)
+  const getMinDateTimeLocal = () => {
+    const now = new Date(Date.now() + 2 * 60 * 1000)
+    const year = now.getFullYear()
+    const month = String(now.getMonth() + 1).padStart(2, '0')
+    const day = String(now.getDate()).padStart(2, '0')
+    const hours = String(now.getHours()).padStart(2, '0')
+    const minutes = String(now.getMinutes()).padStart(2, '0')
+    return `${year}-${month}-${day}T${hours}:${minutes}`
+  }
 
   const handleAddOption = () => {
     if (options.length >= 10) {
@@ -71,7 +83,7 @@ export function CreatePollPage() {
       return
     }
 
-    // Calculate expiry timestamp
+    // Calculate expiry timestamp in UTC ISO format
     let expiryAt = null
     if (expiryOption === '1h') {
       expiryAt = new Date(Date.now() + 60 * 60 * 1000).toISOString()
@@ -79,6 +91,17 @@ export function CreatePollPage() {
       expiryAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
     } else if (expiryOption === '7d') {
       expiryAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    } else if (expiryOption === 'custom') {
+      if (!customDateTime) {
+        toastError('Please select a custom close date and time')
+        return
+      }
+      const customDate = new Date(customDateTime)
+      if (isNaN(customDate.getTime()) || customDate.getTime() <= Date.now()) {
+        toastError('Custom close date and time must be in the future')
+        return
+      }
+      expiryAt = customDate.toISOString()
     }
 
     setLoading(true)
@@ -222,12 +245,12 @@ export function CreatePollPage() {
             )}
           </div>
 
-          {/* Poll Expiry Configuration */}
+          {/* Poll Auto-Close Duration / Custom Date Configuration */}
           <div className="form-group" style={{ marginTop: '1.75rem', borderTop: '1px solid var(--border-subtle)', paddingTop: '1.25rem' }}>
             <label className="form-label" htmlFor="expiry">
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <Clock size={16} />
-                <span>Auto-Close Poll Duration</span>
+                <span>Auto-Close Poll Schedule</span>
               </span>
             </label>
             <select
@@ -240,7 +263,33 @@ export function CreatePollPage() {
               <option value="1h">Close Automatically in 1 Hour</option>
               <option value="24h">Close Automatically in 24 Hours</option>
               <option value="7d">Close Automatically in 7 Days</option>
+              <option value="custom">📅 Pick Custom Date & Time...</option>
             </select>
+
+            {/* Custom Datetime Picker */}
+            {expiryOption === 'custom' && (
+              <div style={{ marginTop: '0.85rem', animation: 'fadeIn 0.2s ease-out' }}>
+                <label className="form-label" htmlFor="custom-datetime">
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--primary-light)' }}>
+                    <Calendar size={15} />
+                    <span>Exact Date & Time (in your local timezone):</span>
+                  </span>
+                </label>
+                <input
+                  id="custom-datetime"
+                  type="datetime-local"
+                  required
+                  min={getMinDateTimeLocal()}
+                  className="form-input"
+                  value={customDateTime}
+                  onChange={(e) => setCustomDateTime(e.target.value)}
+                  style={{ fontFamily: 'var(--font-mono)', fontSize: '0.95rem' }}
+                />
+                <span style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
+                  The poll will automatically stop accepting votes when this timestamp arrives.
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Submit Action */}
