@@ -192,9 +192,9 @@ export function PollResultsPage() {
             {/* Scheduled Auto-Close Time Pill */}
             {!poll.is_closed && formattedCloseTime && (
               <span className="badge" style={{
-                background: 'rgba(245, 158, 11, 0.12)',
-                color: '#fbbf24',
-                border: '1px solid rgba(245, 158, 11, 0.3)',
+                background: 'rgba(245, 158, 11, 0.1)',
+                color: 'var(--accent-amber)',
+                border: '1px solid rgba(245, 158, 11, 0.28)',
                 textTransform: 'none',
                 fontSize: '0.78rem',
                 fontFamily: 'var(--font-sans)',
@@ -266,7 +266,7 @@ export function PollResultsPage() {
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '0.85rem 1.25rem',
-          background: 'var(--bg-secondary)',
+          background: 'var(--bg-total-banner)',
           border: '1px solid var(--border-subtle)',
           borderRadius: 'var(--radius-md)',
           marginBottom: '2rem',

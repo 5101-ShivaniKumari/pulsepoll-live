@@ -76,13 +76,15 @@ export function App() {
         textAlign: 'center',
         fontSize: '0.85rem',
         color: 'var(--text-muted)',
+        background: 'transparent',
+        transition: 'border-color var(--transition-normal)',
       }}>
         <div style={{ maxWidth: '1120px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <strong style={{ color: 'var(--text-secondary)' }}>PulsePoll</strong> — Real-Time Live Polling System
           </div>
           <div>
-            Built with Go (Gin), Redis Pub/Sub, WebSockets, MongoDB & React
+            Built with Go (Gin), Redis Pub/Sub, WebSockets, MongoDB &amp; React
           </div>
         </div>
       </footer>

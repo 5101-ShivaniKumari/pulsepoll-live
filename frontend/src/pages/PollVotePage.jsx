@@ -138,9 +138,9 @@ export function PollVotePage() {
             {/* Scheduled Auto-Close Time Pill */}
             {!poll.is_closed && formattedCloseTime && (
               <span className="badge" style={{
-                background: 'rgba(245, 158, 11, 0.12)',
-                color: '#fbbf24',
-                border: '1px solid rgba(245, 158, 11, 0.3)',
+                background: 'rgba(245, 158, 11, 0.1)',
+                color: 'var(--accent-amber)',
+                border: '1px solid rgba(245, 158, 11, 0.28)',
                 textTransform: 'none',
                 fontSize: '0.78rem',
                 fontFamily: 'var(--font-sans)',
@@ -187,8 +187,8 @@ export function PollVotePage() {
         {/* Closed or Expired State Notice */}
         {poll.is_closed ? (
           <div style={{
-            background: 'rgba(148, 163, 184, 0.08)',
-            border: '1px solid rgba(148, 163, 184, 0.2)',
+            background: 'var(--closed-bg)',
+            border: '1px solid var(--closed-border)',
             borderRadius: 'var(--radius-md)',
             padding: '1.5rem',
             textAlign: 'center',
@@ -206,8 +206,8 @@ export function PollVotePage() {
         ) : poll.has_voted ? (
           /* Already Voted Notice */
           <div style={{
-            background: 'rgba(16, 185, 129, 0.08)',
-            border: '1px solid rgba(16, 185, 129, 0.25)',
+            background: 'var(--voted-bg)',
+            border: '1px solid var(--voted-border)',
             borderRadius: 'var(--radius-md)',
             padding: '1.5rem',
             textAlign: 'center',

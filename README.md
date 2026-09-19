@@ -197,3 +197,15 @@ Deploy the `/frontend` folder to Vercel:
 4. Cast a vote in Tab B -> Watch the percentage bars in Tab A and Tab C animate **instantly without page reload**.
 5. Try voting a second time from Tab B -> Observe the duplicate vote prevention toast and restriction.
 6. In Tab A, click **Close Poll** -> Observe Tab B and Tab C immediately transition to "Voting Closed".
+
+---
+
+## 🌙 Dark / Light Mode
+
+PulsePoll features a first-class adaptive theme system accessible from every page via the **Sun/Moon toggle** in the navbar.
+
+- **System preference by default**: On first visit, the theme is automatically set based on your OS-level `prefers-color-scheme` preference — no jarring flash of the wrong theme.
+- **Persistent choice**: Once you manually toggle the theme, your preference is stored in `localStorage` (`pulsepoll_theme`) and applied on all future visits, overriding the system default.
+- **Zero flash on load**: An inline synchronous script in `index.html` reads your stored preference *before* the browser renders anything — confirmed to work on page load and hard refresh.
+- **Full component coverage**: Every component adapts — navbar, glassmorphism cards, forms, buttons, animated bar charts, status badges (live/closed), modals (share & confirmation), toast notifications, QR code modal, and vote option cards.
+- **Polished light mode**: Light mode follows a pearl/slate glassmorphism aesthetic that is a deliberate, premium counterpart to the obsidian dark theme — not a bare browser default.

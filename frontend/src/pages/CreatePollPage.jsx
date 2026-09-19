@@ -196,6 +196,7 @@ export function CreatePollPage() {
                     borderRadius: '50%',
                     background: 'var(--bg-tertiary)',
                     color: 'var(--text-secondary)',
+                    border: '1px solid var(--border-subtle)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',

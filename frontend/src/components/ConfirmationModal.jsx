@@ -12,7 +12,11 @@ export function ConfirmationModal({ isOpen, title, message, confirmText = 'Confi
             <AlertTriangle size={20} />
             <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--text-primary)' }}>{title}</h3>
           </div>
-          <button onClick={onCancel} className="btn-ghost" style={{ padding: '4px', border: 'none', cursor: 'pointer' }}>
+          <button
+            onClick={onCancel}
+            className="btn-ghost"
+            style={{ padding: '4px', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', borderRadius: 'var(--radius-sm)' }}
+          >
             <X size={18} />
           </button>
         </div>

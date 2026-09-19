@@ -41,10 +41,10 @@ export function AnimatedBarChart({
             key={option.id}
             className={`result-row ${isRecentlyVoted ? 'option-flash-highlight' : ''}`}
             style={{
-              background: isUserVote ? 'rgba(99, 102, 241, 0.07)' : 'transparent',
+              background: isUserVote ? 'var(--vote-selected-bg)' : 'transparent',
               padding: isUserVote ? '0.75rem 1rem' : '0.25rem 0',
               borderRadius: isUserVote ? 'var(--radius-md)' : 'var(--radius-sm)',
-              border: isUserVote ? '1px solid rgba(99, 102, 241, 0.25)' : '1px solid transparent',
+              border: isUserVote ? '1px solid var(--vote-selected-border)' : '1px solid transparent',
               transition: 'all var(--transition-normal)',
               position: 'relative',
             }}
@@ -67,9 +67,10 @@ export function AnimatedBarChart({
                     fontSize: '0.75rem',
                     padding: '2px 8px',
                     borderRadius: 'var(--radius-full)',
-                    background: 'rgba(99, 102, 241, 0.2)',
+                    background: 'rgba(99, 102, 241, 0.15)',
                     color: 'var(--primary-light)',
                     fontWeight: 600,
+                    border: '1px solid rgba(99, 102, 241, 0.25)',
                   }}>
                     <Check size={12} /> Your Vote
                   </span>
@@ -83,9 +84,10 @@ export function AnimatedBarChart({
                     fontSize: '0.72rem',
                     padding: '2px 7px',
                     borderRadius: 'var(--radius-full)',
-                    background: 'rgba(245, 158, 11, 0.15)',
-                    color: '#fbbf24',
+                    background: 'rgba(245, 158, 11, 0.12)',
+                    color: '#f59e0b',
                     fontWeight: 600,
+                    border: '1px solid rgba(245, 158, 11, 0.25)',
                   }}>
                     <Trophy size={11} /> Leading
                   </span>

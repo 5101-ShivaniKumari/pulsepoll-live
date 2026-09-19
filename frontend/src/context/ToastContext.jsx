@@ -28,15 +28,27 @@ export function ToastProvider({ children }) {
       {children}
       <div className="toast-container" aria-live="polite">
         {toasts.map(toast => (
-          <div key={toast.id} className="toast" role="alert">
+          <div
+            key={toast.id}
+            className="toast"
+            role="alert"
+          >
             {toast.type === 'success' && <CheckCircle2 size={18} color="#10b981" />}
             {toast.type === 'error' && <AlertCircle size={18} color="#f43f5e" />}
-            {toast.type === 'info' && <Info size={18} color="#6366f1" />}
+            {toast.type === 'info' && <Info size={18} color="var(--primary-light)" />}
             <span style={{ flex: 1 }}>{toast.message}</span>
             <button
               onClick={() => removeToast(toast.id)}
-              className="btn-ghost"
-              style={{ padding: '2px', border: 'none', cursor: 'pointer', display: 'flex' }}
+              style={{
+                padding: '2px',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                background: 'transparent',
+                color: 'var(--text-muted)',
+                borderRadius: 'var(--radius-sm)',
+              }}
             >
               <X size={14} />
             </button>

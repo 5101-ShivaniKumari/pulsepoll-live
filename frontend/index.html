@@ -7,6 +7,27 @@
     <title>PulsePoll — Real-Time Live Polling Platform</title>
     <meta name="description" content="Create live interactive polls with instantaneous real-time results powered by Redis Pub/Sub, WebSockets, and Go." />
     
+    <!-- Anti-flash: apply theme BEFORE first paint to prevent flash of wrong theme -->
+    <script>
+      (function() {
+        try {
+          var stored = localStorage.getItem('pulsepoll_theme');
+          if (stored === 'dark' || stored === 'light') {
+            document.documentElement.setAttribute('data-theme', stored);
+            document.documentElement.style.colorScheme = stored;
+          } else {
+            var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            var theme = prefersDark ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', theme);
+            document.documentElement.style.colorScheme = theme;
+          }
+        } catch(e) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+          document.documentElement.style.colorScheme = 'dark';
+        }
+      })();
+    </script>
+
     <!-- Google Fonts: Inter & Outfit -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

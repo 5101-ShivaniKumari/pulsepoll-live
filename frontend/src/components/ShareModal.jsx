@@ -34,7 +34,11 @@ export function ShareModal({ poll, isOpen, onClose }) {
             <Share2 size={20} color="var(--primary-light)" />
             <h3 style={{ margin: 0, fontSize: '1.25rem' }}>Share Live Poll</h3>
           </div>
-          <button onClick={onClose} className="btn-ghost" style={{ padding: '4px', border: 'none', cursor: 'pointer' }}>
+          <button
+            onClick={onClose}
+            className="btn-ghost"
+            style={{ padding: '4px', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', borderRadius: 'var(--radius-sm)' }}
+          >
             <X size={18} />
           </button>
         </div>
@@ -43,26 +47,15 @@ export function ShareModal({ poll, isOpen, onClose }) {
           Share this link with your audience. Votes will roll in live instantly on the results screen.
         </p>
 
-        {/* QR Code Presentation */}
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '1.25rem',
-          background: '#ffffff',
-          borderRadius: 'var(--radius-md)',
-          marginBottom: '1.25rem',
-        }}>
+        {/* QR Code — always white bg so QR is scannable in both themes */}
+        <div className="qr-code-wrapper">
           <QRCodeSVG
             value={shareUrl}
             size={180}
             level="H"
             includeMargin={true}
           />
-          <span style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.4rem', fontWeight: 600 }}>
-            Scan to Vote Immediately
-          </span>
+          <span className="qr-code-caption">Scan to Vote Immediately</span>
         </div>
 
         {/* Copy Link Input Box */}

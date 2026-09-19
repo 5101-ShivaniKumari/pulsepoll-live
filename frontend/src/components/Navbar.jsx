@@ -1,10 +1,12 @@
 import React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { Activity, PlusCircle, LayoutDashboard, LogOut, LogIn, UserPlus } from 'lucide-react'
+import { useTheme } from '../context/ThemeContext'
+import { Activity, PlusCircle, LayoutDashboard, LogOut, LogIn, UserPlus, Sun, Moon } from 'lucide-react'
 
 export function Navbar() {
   const { user, isAuthenticated, logout } = useAuth()
+  const { isDark, toggleTheme } = useTheme()
   const navigate = useNavigate()
 
   const handleLogout = () => {
@@ -15,11 +17,13 @@ export function Navbar() {
   return (
     <header style={{
       borderBottom: '1px solid var(--border-subtle)',
-      background: 'rgba(9, 13, 22, 0.85)',
-      backdropFilter: 'blur(12px)',
+      background: 'var(--bg-header)',
+      backdropFilter: 'blur(14px)',
+      WebkitBackdropFilter: 'blur(14px)',
       position: 'sticky',
       top: 0,
       zIndex: 100,
+      transition: 'background var(--transition-normal), border-color var(--transition-normal)',
     }}>
       <div style={{
         maxWidth: '1120px',
@@ -40,6 +44,7 @@ export function Navbar() {
             alignItems: 'center',
             justifyContent: 'center',
             boxShadow: '0 0 16px rgba(99, 102, 241, 0.4)',
+            flexShrink: 0,
           }}>
             <Activity size={22} color="#ffffff" />
           </div>
@@ -48,7 +53,9 @@ export function Navbar() {
               fontFamily: 'var(--font-heading)',
               fontWeight: 800,
               fontSize: '1.35rem',
-              background: 'linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%)',
+              background: isDark
+                ? 'linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%)'
+                : 'linear-gradient(135deg, #0f172a 0%, #4f46e5 100%)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               letterSpacing: '-0.03em',
@@ -72,7 +79,7 @@ export function Navbar() {
         </Link>
 
         {/* Navigation & User actions */}
-        <nav style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <nav style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
           {isAuthenticated ? (
             <>
               <Link to="/dashboard" className="btn btn-ghost btn-sm" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -85,7 +92,7 @@ export function Navbar() {
                 <span>New Poll</span>
               </Link>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginLeft: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginLeft: '0.25rem' }}>
                 <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                   {user?.name}
                 </span>
@@ -107,6 +114,19 @@ export function Navbar() {
               </Link>
             </>
           )}
+
+          {/* Theme Toggle */}
+          <button
+            className="theme-toggle-btn"
+            onClick={toggleTheme}
+            title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {isDark
+              ? <Sun size={17} strokeWidth={2} />
+              : <Moon size={17} strokeWidth={2} />
+            }
+          </button>
         </nav>
       </div>
     </header>

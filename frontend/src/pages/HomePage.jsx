@@ -29,7 +29,7 @@ export function HomePage() {
           marginBottom: '1.5rem',
         }}>
           <Sparkles size={15} />
-          <span>Real-Time Polling Engine Driven by Go, Redis & WebSockets</span>
+          <span>Real-Time Polling Engine Driven by Go, Redis &amp; WebSockets</span>
         </div>
 
         <h1 style={{
@@ -93,8 +93,8 @@ export function HomePage() {
             width: '44px',
             height: '44px',
             borderRadius: '12px',
-            background: 'rgba(99, 102, 241, 0.15)',
-            border: '1px solid rgba(99, 102, 241, 0.3)',
+            background: 'rgba(99, 102, 241, 0.12)',
+            border: '1px solid rgba(99, 102, 241, 0.25)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -113,14 +113,14 @@ export function HomePage() {
             width: '44px',
             height: '44px',
             borderRadius: '12px',
-            background: 'rgba(16, 185, 129, 0.15)',
-            border: '1px solid rgba(16, 185, 129, 0.3)',
+            background: 'rgba(16, 185, 129, 0.12)',
+            border: '1px solid rgba(16, 185, 129, 0.25)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             marginBottom: '1.25rem',
           }}>
-            <ShieldCheck size={22} color="#34d399" />
+            <ShieldCheck size={22} color="var(--accent-emerald)" />
           </div>
           <h3 style={{ fontSize: '1.2rem', marginBottom: '0.6rem' }}>Multi-Tier Deduplication</h3>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', lineHeight: 1.6 }}>
@@ -133,8 +133,8 @@ export function HomePage() {
             width: '44px',
             height: '44px',
             borderRadius: '12px',
-            background: 'rgba(6, 182, 212, 0.15)',
-            border: '1px solid rgba(6, 182, 212, 0.3)',
+            background: 'rgba(6, 182, 212, 0.12)',
+            border: '1px solid rgba(6, 182, 212, 0.25)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -142,7 +142,7 @@ export function HomePage() {
           }}>
             <QrCode size={22} color="var(--accent-cyan)" />
           </div>
-          <h3 style={{ fontSize: '1.2rem', marginBottom: '0.6rem' }}>Zero-Friction Sharing & QR</h3>
+          <h3 style={{ fontSize: '1.2rem', marginBottom: '0.6rem' }}>Zero-Friction Sharing &amp; QR</h3>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', lineHeight: 1.6 }}>
             Voters don't need accounts. Distribute via direct link or display the instant QR code during live presentations, webinars, or classrooms.
           </p>
