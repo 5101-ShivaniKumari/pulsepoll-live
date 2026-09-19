@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/livepoll/backend/internal/models"
@@ -22,23 +23,39 @@ var (
 )
 
 type MongoRepo struct {
-	client *mongo.Client
-	db     *mongo.Database
-	users  *mongo.Collection
-	polls  *mongo.Collection
-	votes  *mongo.Collection
+	client     *mongo.Client
+	db         *mongo.Database
+	users      *mongo.Collection
+	polls      *mongo.Collection
+	votes      *mongo.Collection
+	isInMemory bool
+
+	// In-memory storage structures for zero-config fallback
+	mu       sync.RWMutex
+	memUsers map[string]*models.User // keyed by ID hex and email
+	memPolls map[string]*models.Poll // keyed by ID hex
+	memVotes map[string]*models.Vote // keyed by "pollID:voterToken"
 }
 
 func NewMongoRepo(ctx context.Context, uri, dbName string) (*MongoRepo, error) {
-	clientOpts := options.Client().ApplyURI(uri).SetTimeout(10 * time.Second)
+	clientOpts := options.Client().ApplyURI(uri).SetTimeout(3 * time.Second)
 	client, err := mongo.Connect(ctx, clientOpts)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to mongo: %w", err)
+	
+	pingErr := error(nil)
+	if err == nil {
+		pingCtx, pingCancel := context.WithTimeout(ctx, 2*time.Second)
+		defer pingCancel()
+		pingErr = client.Ping(pingCtx, nil)
 	}
 
-	// Ping Mongo to ensure connection is alive
-	if err := client.Ping(ctx, nil); err != nil {
-		return nil, fmt.Errorf("mongo ping failed: %w", err)
+	if err != nil || pingErr != nil {
+		log.Printf("[INFO] MongoDB at '%s' is not reachable (%v). Using fast In-Memory fallback store.", uri, pingErr)
+		return &MongoRepo{
+			isInMemory: true,
+			memUsers:   make(map[string]*models.User),
+			memPolls:   make(map[string]*models.Poll),
+			memVotes:   make(map[string]*models.Vote),
+		}, nil
 	}
 
 	db := client.Database(dbName)
@@ -59,11 +76,16 @@ func NewMongoRepo(ctx context.Context, uri, dbName string) (*MongoRepo, error) {
 }
 
 func (r *MongoRepo) Close(ctx context.Context) error {
-	return r.client.Disconnect(ctx)
+	if r.client != nil {
+		return r.client.Disconnect(ctx)
+	}
+	return nil
 }
 
 func (r *MongoRepo) initIndexes(ctx context.Context) error {
-	// User: email unique index
+	if r.isInMemory {
+		return nil
+	}
 	_, err := r.users.Indexes().CreateOne(ctx, mongo.IndexModel{
 		Keys:    bson.D{{Key: "email", Value: 1}},
 		Options: options.Index().SetUnique(true),
@@ -72,7 +94,6 @@ func (r *MongoRepo) initIndexes(ctx context.Context) error {
 		return err
 	}
 
-	// Vote: unique compound index on (poll_id, voter_token)
 	_, err = r.votes.Indexes().CreateOne(ctx, mongo.IndexModel{
 		Keys: bson.D{
 			{Key: "poll_id", Value: 1},
@@ -84,15 +105,10 @@ func (r *MongoRepo) initIndexes(ctx context.Context) error {
 		return err
 	}
 
-	// Poll: index on creator_id
 	_, err = r.polls.Indexes().CreateOne(ctx, mongo.IndexModel{
 		Keys: bson.D{{Key: "creator_id", Value: 1}},
 	})
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // User Operations
@@ -100,6 +116,20 @@ func (r *MongoRepo) initIndexes(ctx context.Context) error {
 func (r *MongoRepo) CreateUser(ctx context.Context, user *models.User) error {
 	user.CreatedAt = time.Now().UTC()
 	user.UpdatedAt = time.Now().UTC()
+
+	if r.isInMemory {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		for _, u := range r.memUsers {
+			if u.Email == user.Email {
+				return ErrUserAlreadyExists
+			}
+		}
+		user.ID = primitive.NewObjectID()
+		copyUser := *user
+		r.memUsers[user.ID.Hex()] = &copyUser
+		return nil
+	}
 
 	res, err := r.users.InsertOne(ctx, user)
 	if err != nil {
@@ -116,6 +146,18 @@ func (r *MongoRepo) CreateUser(ctx context.Context, user *models.User) error {
 }
 
 func (r *MongoRepo) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
+	if r.isInMemory {
+		r.mu.RLock()
+		defer r.mu.RUnlock()
+		for _, u := range r.memUsers {
+			if u.Email == email {
+				copyUser := *u
+				return &copyUser, nil
+			}
+		}
+		return nil, ErrUserNotFound
+	}
+
 	var user models.User
 	err := r.users.FindOne(ctx, bson.M{"email": email}).Decode(&user)
 	if err != nil {
@@ -128,6 +170,16 @@ func (r *MongoRepo) GetUserByEmail(ctx context.Context, email string) (*models.U
 }
 
 func (r *MongoRepo) GetUserByID(ctx context.Context, id primitive.ObjectID) (*models.User, error) {
+	if r.isInMemory {
+		r.mu.RLock()
+		defer r.mu.RUnlock()
+		if u, exists := r.memUsers[id.Hex()]; exists {
+			copyUser := *u
+			return &copyUser, nil
+		}
+		return nil, ErrUserNotFound
+	}
+
 	var user models.User
 	err := r.users.FindOne(ctx, bson.M{"_id": id}).Decode(&user)
 	if err != nil {
@@ -147,6 +199,18 @@ func (r *MongoRepo) CreatePoll(ctx context.Context, poll *models.Poll) error {
 	poll.TotalVotes = 0
 	poll.IsClosed = false
 
+	if r.isInMemory {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		poll.ID = primitive.NewObjectID()
+		copyPoll := *poll
+		// Deep copy options
+		copyPoll.Options = make([]models.Option, len(poll.Options))
+		copy(copyPoll.Options, poll.Options)
+		r.memPolls[poll.ID.Hex()] = &copyPoll
+		return nil
+	}
+
 	res, err := r.polls.InsertOne(ctx, poll)
 	if err != nil {
 		return err
@@ -159,6 +223,19 @@ func (r *MongoRepo) CreatePoll(ctx context.Context, poll *models.Poll) error {
 }
 
 func (r *MongoRepo) GetPollByID(ctx context.Context, id primitive.ObjectID) (*models.Poll, error) {
+	if r.isInMemory {
+		r.mu.RLock()
+		defer r.mu.RUnlock()
+		p, exists := r.memPolls[id.Hex()]
+		if !exists {
+			return nil, ErrPollNotFound
+		}
+		copyPoll := *p
+		copyPoll.Options = make([]models.Option, len(p.Options))
+		copy(copyPoll.Options, p.Options)
+		return &copyPoll, nil
+	}
+
 	var poll models.Poll
 	err := r.polls.FindOne(ctx, bson.M{"_id": id}).Decode(&poll)
 	if err != nil {
@@ -171,6 +248,21 @@ func (r *MongoRepo) GetPollByID(ctx context.Context, id primitive.ObjectID) (*mo
 }
 
 func (r *MongoRepo) GetPollsByCreatorID(ctx context.Context, creatorID primitive.ObjectID) ([]models.Poll, error) {
+	if r.isInMemory {
+		r.mu.RLock()
+		defer r.mu.RUnlock()
+		var polls []models.Poll
+		for _, p := range r.memPolls {
+			if p.CreatorID == creatorID {
+				copyPoll := *p
+				copyPoll.Options = make([]models.Option, len(p.Options))
+				copy(copyPoll.Options, p.Options)
+				polls = append(polls, copyPoll)
+			}
+		}
+		return polls, nil
+	}
+
 	opts := options.Find().SetSort(bson.D{{Key: "created_at", Value: -1}})
 	cursor, err := r.polls.Find(ctx, bson.M{"creator_id": creatorID}, opts)
 	if err != nil {
@@ -189,6 +281,18 @@ func (r *MongoRepo) GetPollsByCreatorID(ctx context.Context, creatorID primitive
 }
 
 func (r *MongoRepo) ClosePoll(ctx context.Context, pollID primitive.ObjectID, creatorID primitive.ObjectID) error {
+	if r.isInMemory {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		p, exists := r.memPolls[pollID.Hex()]
+		if !exists || p.CreatorID != creatorID {
+			return ErrPollNotFound
+		}
+		p.IsClosed = true
+		p.UpdatedAt = time.Now().UTC()
+		return nil
+	}
+
 	filter := bson.M{
 		"_id":        pollID,
 		"creator_id": creatorID,
@@ -211,6 +315,17 @@ func (r *MongoRepo) ClosePoll(ctx context.Context, pollID primitive.ObjectID, cr
 }
 
 func (r *MongoRepo) DeletePoll(ctx context.Context, pollID primitive.ObjectID, creatorID primitive.ObjectID) error {
+	if r.isInMemory {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		p, exists := r.memPolls[pollID.Hex()]
+		if !exists || p.CreatorID != creatorID {
+			return ErrPollNotFound
+		}
+		delete(r.memPolls, pollID.Hex())
+		return nil
+	}
+
 	filter := bson.M{
 		"_id":        pollID,
 		"creator_id": creatorID,
@@ -222,7 +337,6 @@ func (r *MongoRepo) DeletePoll(ctx context.Context, pollID primitive.ObjectID, c
 	if res.DeletedCount == 0 {
 		return ErrPollNotFound
 	}
-	// Also delete votes for this poll
 	_, _ = r.votes.DeleteMany(ctx, bson.M{"poll_id": pollID})
 	return nil
 }
@@ -231,6 +345,34 @@ func (r *MongoRepo) DeletePoll(ctx context.Context, pollID primitive.ObjectID, c
 
 func (r *MongoRepo) RecordVote(ctx context.Context, vote *models.Vote) error {
 	vote.CreatedAt = time.Now().UTC()
+
+	if r.isInMemory {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+
+		voteKey := fmt.Sprintf("%s:%s", vote.PollID.Hex(), vote.VoterToken)
+		if _, exists := r.memVotes[voteKey]; exists {
+			return ErrVoteAlreadyExists
+		}
+
+		vote.ID = primitive.NewObjectID()
+		copyVote := *vote
+		r.memVotes[voteKey] = &copyVote
+
+		// Increment poll totals in memory
+		if p, exists := r.memPolls[vote.PollID.Hex()]; exists {
+			p.TotalVotes++
+			for i := range p.Options {
+				if p.Options[i].ID == vote.OptionID {
+					p.Options[i].VoteCount++
+					break
+				}
+			}
+			p.UpdatedAt = time.Now().UTC()
+		}
+		return nil
+	}
+
 	_, err := r.votes.InsertOne(ctx, vote)
 	if err != nil {
 		if mongo.IsDuplicateKeyError(err) {
@@ -239,7 +381,6 @@ func (r *MongoRepo) RecordVote(ctx context.Context, vote *models.Vote) error {
 		return err
 	}
 
-	// Atomically increment the option vote count and total votes in MongoDB poll document
 	filter := bson.M{
 		"_id":        vote.PollID,
 		"options.id": vote.OptionID,
@@ -259,6 +400,16 @@ func (r *MongoRepo) RecordVote(ctx context.Context, vote *models.Vote) error {
 }
 
 func (r *MongoRepo) GetVotedOption(ctx context.Context, pollID primitive.ObjectID, voterToken string) (string, bool, error) {
+	if r.isInMemory {
+		r.mu.RLock()
+		defer r.mu.RUnlock()
+		voteKey := fmt.Sprintf("%s:%s", pollID.Hex(), voterToken)
+		if v, exists := r.memVotes[voteKey]; exists {
+			return v.OptionID, true, nil
+		}
+		return "", false, nil
+	}
+
 	var vote models.Vote
 	err := r.votes.FindOne(ctx, bson.M{
 		"poll_id":     pollID,

@@ -89,11 +89,30 @@ func (h *Hub) addClient(client *Client) {
 		}
 		h.rooms[client.pollID] = room
 
-		// Start Redis Pub/Sub subscription for this poll room
+		// Start Redis Pub/Sub or In-Memory subscription for this poll room
 		ctx, cancel := context.WithCancel(context.Background())
 		room.cancelSub = cancel
-		room.pubsub = h.redisRepo.SubscribeToPoll(ctx, client.pollID)
-		go h.listenRedisChannel(room, ctx)
+		if h.redisRepo.IsInMemory() {
+			memCh := make(chan []byte, 32)
+			unsubscribe := h.redisRepo.SubscribeInMemory(client.pollID, memCh)
+			go func() {
+				defer unsubscribe()
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case msg, ok := <-memCh:
+						if !ok {
+							return
+						}
+						h.broadcastToRoom(room, msg)
+					}
+				}
+			}()
+		} else {
+			room.pubsub = h.redisRepo.SubscribeToPoll(ctx, client.pollID)
+			go h.listenRedisChannel(room, ctx)
+		}
 	}
 	h.mu.Unlock()
 
@@ -121,7 +140,7 @@ func (h *Hub) removeClient(client *Client) {
 	room.mu.Unlock()
 
 	if empty {
-		// Clean up Redis subscription and room to free resources
+		// Clean up Redis/Memory subscription and room to free resources
 		if room.cancelSub != nil {
 			room.cancelSub()
 		}
@@ -129,12 +148,15 @@ func (h *Hub) removeClient(client *Client) {
 			_ = room.pubsub.Close()
 		}
 		delete(h.rooms, client.pollID)
-		log.Printf("[WS] All clients left poll room %s, closed Redis subscription", client.pollID)
+		log.Printf("[WS] All clients left poll room %s, closed subscription", client.pollID)
 	}
 	h.mu.Unlock()
 }
 
 func (h *Hub) listenRedisChannel(room *Room, ctx context.Context) {
+	if room.pubsub == nil {
+		return
+	}
 	ch := room.pubsub.Channel()
 	for {
 		select {
